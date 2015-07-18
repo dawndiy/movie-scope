@@ -1,0 +1,15 @@
+{
+    "name": "movie-scope",
+    "description": "Movie Scope Demo",
+    "architecture": "armhf",
+    "title": "Movie Scope",
+    "hooks": {
+        "movie-scope": {
+            "scope": "movie-scope",
+            "apparmor": "apparmor.json"
+        }
+    },
+    "version": "0.1",
+    "maintainer": "DawnDIY <chenglu1990@gmail.com>",
+    "framework" : "ubuntu-sdk-15.04"
+}
