@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/bitly/go-simplejson"
 	"log"
 	"net/http"
@@ -31,6 +32,27 @@ func makeURL(api string, opts apiOptions) string {
 	}
 
 	return strings.Join(params, "&")
+}
+
+func GetAPIData(api string, kwargs map[string]interface{}) (*simplejson.Json, error) {
+
+	params := []string{api}
+	kwargs["ak"] = APP_KEY
+	kwargs["output"] = "json"
+	for k, v := range kwargs {
+		params = append(params, k+"="+fmt.Sprint(v))
+	}
+	url := strings.Join(params, "&")
+	log.Println("URL: ", url)
+
+	res, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	data, err := simplejson.NewFromReader(res.Body)
+	return data, err
 }
 
 // 热映电影
