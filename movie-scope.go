@@ -95,6 +95,12 @@ func (m *MovieScope) Search(query *scopes.CannedQuery, metadata *scopes.SearchMe
 	} else {
 		// 有搜索
 		log.Println("[搜索]: ", queryStr)
+		switch dptId {
+		case "":
+			m.searchHome(metadata, reply, queryStr)
+		case "hot_movie":
+		case "nearby_cinema":
+		}
 	}
 
 	return nil
@@ -145,7 +151,7 @@ func (m *MovieScope) createDepartments(query *scopes.CannedQuery, metadata *scop
 func (m *MovieScope) showHome(metadata *scopes.SearchMetadata, reply *scopes.SearchReply) {
 
 	location := metadata.Location()
-	loc := "39.9289,116.3883"
+	loc := "116.3883,39.9289"
 	if location != nil {
 		loc = geoConv(location.Longitude, location.Latitude, false)
 	}
@@ -169,6 +175,7 @@ func (m *MovieScope) showHome(metadata *scopes.SearchMetadata, reply *scopes.Sea
 		result := scopes.NewCategorisedResult(category)
 
 		result.Set("type", "movie")
+		result.Set("loc", loc)
 		result.Set("map", movie)
 		result.SetTitle(fmt.Sprint(movie["movie_name"]))
 		result.SetArt(fmt.Sprint(movie["movie_picture"]))
@@ -185,7 +192,7 @@ func (m *MovieScope) showHome(metadata *scopes.SearchMetadata, reply *scopes.Sea
 func (m *MovieScope) showHotMovies(metadata *scopes.SearchMetadata, reply *scopes.SearchReply) {
 
 	location := metadata.Location()
-	loc := "39.9289,116.3883"
+	loc := "116.3883,39.9289"
 	if location != nil {
 		loc = geoConv(location.Longitude, location.Latitude, false)
 	}
@@ -209,6 +216,7 @@ func (m *MovieScope) showHotMovies(metadata *scopes.SearchMetadata, reply *scope
 		result := scopes.NewCategorisedResult(category)
 
 		result.Set("type", "movie")
+		result.Set("loc", loc)
 		result.Set("map", movie)
 		result.SetTitle(fmt.Sprint(movie["movie_name"]))
 		result.SetArt(fmt.Sprint(movie["movie_picture"]))
@@ -225,11 +233,11 @@ func (m *MovieScope) showHotMovies(metadata *scopes.SearchMetadata, reply *scope
 func (m *MovieScope) showNearbyCinemas(metadata *scopes.SearchMetadata, reply *scopes.SearchReply) {
 
 	location := metadata.Location()
-	loc := "39.9289,116.3883"
+	loc := "116.3883,39.9289"
 	if location != nil {
 		loc = geoConv(location.Longitude, location.Latitude, false)
 	}
-	loc = "116.43229664960474,40.04485553445356"
+	// loc = "116.43229664960474,40.04485553445356"
 	log.Println("LOC: ", location, loc)
 
 	args := map[string]interface{}{
@@ -265,8 +273,10 @@ func (m *MovieScope) viewHotMovie(result *scopes.Result, reply *scopes.PreviewRe
 
 	var movie map[string]interface{}
 	err := result.Get("map", &movie)
-	// log.Println(movie, err)
-	log.Println(movie, err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	layout1col := scopes.NewColumnLayout(1)
 	layout1col.AddColumn(
@@ -274,6 +284,7 @@ func (m *MovieScope) viewHotMovie(result *scopes.Result, reply *scopes.PreviewRe
 		"image",
 		"text",
 		"description",
+		"cinemas",
 	)
 	reply.RegisterLayout(layout1col)
 
@@ -303,11 +314,49 @@ func (m *MovieScope) viewHotMovie(result *scopes.Result, reply *scopes.PreviewRe
 	description.AddAttributeValue("title", "描述")
 	description.AddAttributeValue("text", movie["movie_message"])
 
+	// ==========================
+	// 查找播放该影片附近的影院
+	movieName := fmt.Sprint(movie["movie_name"])
+	var loc string
+	result.Get("loc", &loc)
+
+	param := map[string]interface{}{
+		"wd":       movieName,
+		"location": loc,
+	}
+	log.Println(param, loc)
+
+	jsonData, err := GetAPIData(API_SEARCH_MOVIE, param)
+	var cinemas []interface{}
+	if err == nil {
+		cinemas = jsonData.GetPath("result").MustArray()
+	}
+
+	// 附近播放该影片的影院
+	nearbyCinemas := scopes.NewPreviewWidget("cinemas", "expandable")
+	nearbyCinemas.AddAttributeValue("title", "附近放映的影片")
+	nearbyCinemas.AddAttributeValue("collapsed-widgets", 2)
+
+	for i, cinema := range cinemas {
+		cinema := cinema.(map[string]interface{})
+
+		cInfo := scopes.NewPreviewWidget("cinema"+strconv.Itoa(i), "text")
+		cInfo.AddAttributeValue("title", cinema["name"])
+		text := "地址: " + fmt.Sprint(cinema["address"]) +
+			"<br/>评分: " + fmt.Sprint(cinema["rating"]) +
+			"<br/>电话: " + fmt.Sprint(cinema["telephone"])
+		cInfo.AddAttributeValue("text", text)
+		log.Println(cinema["name"])
+
+		nearbyCinemas.AddWidget(cInfo)
+	}
+
 	reply.PushWidgets(
 		header,
 		image,
 		text,
 		description,
+		nearbyCinemas,
 	)
 
 }
@@ -355,7 +404,7 @@ func (m *MovieScope) viewNearbyCinema(result *scopes.Result, reply *scopes.Previ
 	lng := location["lng"].(float64)
 	lat := location["lat"].(float64)
 	paramLoc := geoConv(lng, lat, true)
-	param := apiOptions{
+	param := map[string]interface{}{
 		"center":       paramLoc,
 		"markers":      paramLoc,
 		"markerStyles": "l,o,0xff0000",
@@ -366,7 +415,7 @@ func (m *MovieScope) viewNearbyCinema(result *scopes.Result, reply *scopes.Previ
 
 	// 静态地图
 	staticImgUrl := APIStaticImage(param)
-	param = apiOptions{
+	param = map[string]interface{}{
 		"ak":       APP_KEY,
 		"location": paramLoc,
 		"width":    "1000",
@@ -405,52 +454,88 @@ func (m *MovieScope) viewNearbyCinema(result *scopes.Result, reply *scopes.Previ
 	title.AddAttributeValue("title", "<b>上映的影片</b>")
 	movies := scopes.NewPreviewWidget("gallery", "gallery")
 	array := []string{}
-	for _, i := range cinema["movies"].([]interface{}) {
-		i := i.(map[string]interface{})
-		array = append(array, fmt.Sprint(i["movie_picture"]))
+
+	// 上映影片信息、场次
+	onMovies := scopes.NewPreviewWidget("onMovies", "expandable")
+	onMovies.AddAttributeValue("title", "<b>影片信息及影院场次</b>")
+	onMovies.AddAttributeValue("collapsed-widgets", 2)
+
+	// 是否有电影数据
+	moviesData, ok := cinema["movies"].([]interface{})
+	if ok {
+		// 电影图片
+		for _, i := range moviesData {
+			i := i.(map[string]interface{})
+			array = append(array, fmt.Sprint(i["movie_picture"]))
+		}
+		movies.AddAttributeValue("sources", array)
+
+		// 信息场次
+		for i, m := range moviesData {
+			m := m.(map[string]interface{})
+			mInfo := scopes.NewPreviewWidget("movie"+strconv.Itoa(i), "text")
+			mInfo.AddAttributeValue("title", m["movie_name"])
+
+			// 是否有场次信息
+			tableData, ok := m["time_table"].([]interface{})
+			if ok {
+				table := "<b>评分:</b> " + fmt.Sprint(m["movie_score"]) + "<br/>" +
+					"<b>主演:</b> " + fmt.Sprint(m["movie_starring"]) + "<br/>" +
+					"<b>介绍:</b> " + fmt.Sprint(m["movie_description"]) + "<br/>" +
+					"<b>场次:</b> "
+				for _, t := range tableData {
+					t := t.(map[string]interface{})
+					time := fmt.Sprint(t["time"])
+					date := fmt.Sprint(t["date"])
+					lan := fmt.Sprint(t["lan"])
+					_type := fmt.Sprint(t["type"])
+					price := fmt.Sprint(t["price"])
+					if lan == "" && _type == "" {
+						lan = "暂无数据"
+					}
+					if price == "" {
+						price = "暂无数据"
+					}
+					table += "<br/> 时间: " + date + " " + time + "<br/>" +
+						" 类型: " + lan + " " + _type + "<br/>" +
+						" 票价: " + price + "<br/>"
+				}
+				mInfo.AddAttributeValue("text", table)
+			}
+
+			onMovies.AddWidget(mInfo)
+
+			/************************************
+			 * 这里可能是一个BUG, tt 内容不显示 *
+			 ***********************************/
+			// tt := scopes.NewPreviewWidget("tt", "expandable")
+			// tt.AddAttributeValue("title", "uuuuu")
+			// tt.AddAttributeValue("collapsed-widgets", 2)
+			// xx := scopes.NewPreviewWidget("xx", "text")
+			// xx.AddAttributeValue("title", "xxxx")
+			// xx.AddAttributeValue("text", "XXXXX")
+			// tt.AddWidget(xx)
+			// onMovies.AddWidget(tt)
+		}
 	}
-	movies.AddAttributeValue("sources", array)
 
-	// // 影片场次
-	// onMovies := scopes.NewPreviewWidget("onMovies", "expandable")
-	// onMovies.AddAttributeValue("title", "<b>影片场次</b>")
-	// onMovies.AddAttributeValue("collapsed-widgets", 2)
-	// for i, m := range cinema.Movies {
-	// 	text := scopes.NewPreviewWidget("movie"+strconv.Itoa(i), "text")
-	// 	text.AddAttributeValue("title", "")
-	// 	table := ""
-	// 	for _, t := range m.TimeTable {
-	// 		if t["type"] == "" {
-	// 			t["type"] = "暂无数据"
-	// 		}
-	// 		if t["price"] == "" {
-	// 			t["price"] = "暂无数据"
-	// 		}
-	// 		table = table + "<br/> 时间:" + t["date"] + " " + t["time"] + "<br/>" +
-	// 			" 类型:" + t["lan"] + " " + t["type"] + "<br/>" +
-	// 			" 票价:" + t["price"] + "<br/>"
-	// 	}
-	// 	text.AddAttributeValue(
-	// 		"text",
-	// 		"<b>「"+m.Name+"」</b><br/>"+
-	// 			"<b>场次: </b>"+table)
-	// 	onMovies.AddWidget(text)
-	// }
+	// 影院评论
+	reviews := scopes.NewPreviewWidget("reviews", "expandable")
+	reviews.AddAttributeValue("title", "<b>影院评论</b>")
+	reviews.AddAttributeValue("collapsed-widgets", 2)
 
-	// // 影院评论
-	// reviews := scopes.NewPreviewWidget("reviews", "expandable")
-	// reviews.AddAttributeValue("title", "<b>影院评论</b>")
-	// reviews.AddAttributeValue("collapsed-widgets", 1)
-	// for i, r := range cinema.Review {
-	// 	text := scopes.NewPreviewWidget("review"+strconv.Itoa(i), "text")
-	// 	//text.AddAttributeValue("title", r["content"])
-	// 	text.AddAttributeValue("title", "")
-	// 	text.AddAttributeValue(
-	// 		"text",
-	// 		"<b>"+r["date"]+"</b><br/>"+
-	// 			r["content"])
-	// 	reviews.AddWidget(text)
-	// }
+	// 是否有评论数据
+	reviewsData, ok := cinema["review"].([]interface{})
+	if ok {
+		for i, r := range reviewsData {
+			r := r.(map[string]interface{})
+
+			rInfo := scopes.NewPreviewWidget("review"+strconv.Itoa(i), "text")
+			rInfo.AddAttributeValue("title", r["date"])
+			rInfo.AddAttributeValue("text", r["content"])
+			reviews.AddWidget(rInfo)
+		}
+	}
 
 	reply.PushWidgets(
 		mapImage,
@@ -459,9 +544,13 @@ func (m *MovieScope) viewNearbyCinema(result *scopes.Result, reply *scopes.Previ
 		title,
 		movies,
 		actions,
-		//		onMovies,
-		//		reviews,
+		onMovies,
+		reviews,
 	)
+}
+
+// 主页搜索
+func (m *MovieScope) searchHome(metadata *scopes.SearchMetadata, reply *scopes.SearchReply, queryStr string) {
 }
 
 func geoConv(lng, lat float64, t bool) string {
@@ -472,7 +561,7 @@ func geoConv(lng, lat float64, t bool) string {
 		return paramLoc
 	}
 
-	param := apiOptions{
+	param := map[string]interface{}{
 		"ak":     APP_KEY,
 		"coords": paramLoc,
 		"from":   "3",
@@ -485,21 +574,8 @@ func geoConv(lng, lat float64, t bool) string {
 	return paramLoc
 }
 
-func Test() {
-	param := map[string]string{
-		"ak": APP_KEY,
-		//"wd":       "末日崩塌",
-		"radius":   "3000m",
-		"location": "116.3883,39.9289",
-		"output":   "json",
-	}
-	out := APINearbyCinema(param)
-	log.Println(out)
-}
-
 func main() {
 	if err := scopes.Run(&MovieScope{}); err != nil {
 		log.Fatalln(err)
 	}
-	//Test()
 }
