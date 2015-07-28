@@ -57,7 +57,7 @@ executeCommand "mkdir -p $SCOPE_NAME/$SCOPE_NAME"
 echo "Done"
 
 echo -n "Copying scope ini file... "
-executeCommand "cp $SCOPE_NAME.ini $SCOPE_NAME/$SCOPE_NAME/${SCOPE_NAME}_${SCOPE_NAME}.ini"
+executeCommand "cp $SCOPE_NAME.ini $SCOPE_NAME/$SCOPE_NAME/${SCOPE_NAME}.ubuntu-dawndiy_${SCOPE_NAME}.ini"
 executeCommand "cp *.png $SCOPE_NAME/$SCOPE_NAME/"
 executeCommand "cp manifest.json $SCOPE_NAME/"
 executeCommand "cp apparmor.json $SCOPE_NAME/"

@@ -1,8 +1,8 @@
 {
-    "name": "movie-scope",
-    "description": "Movie Scope Demo",
-    "architecture": "armhf",
     "title": "Movie Scope",
+    "name": "movie-scope.ubuntu-dawndiy",
+    "description": "Movie Scope. Useful Scope help you to find nearby cinemas.",
+    "architecture": "armhf",
     "hooks": {
         "movie-scope": {
             "scope": "movie-scope",
