@@ -152,7 +152,6 @@ func (m *MovieScope) Preview(result *scopes.Result, metadata *scopes.ActionMetad
 // func (m *MovieScope) PerformAction(result *scopes.Result, metadata *scopes.ActionMetadata, widgetId, actionId string) (*scopes.ActivationResponse, error) {
 // 	// handle the action and then tell the dash what to do next
 // 	// through an ActivationResponse.
-// 	log.Println("******************************************************")
 // 	resp := scopes.NewActivationResponse(scopes.ActivationHideDash)
 // 	return resp, nil
 // }
@@ -625,7 +624,7 @@ func (m *MovieScope) searchMovie(metadata *scopes.SearchMetadata, reply *scopes.
 		return
 	}
 
-	category := reply.RegisterCategory("search_movie", "影片影院搜索", "", searchMovieTemplate)
+	category := reply.RegisterCategory("search_movie", "上映该片的附近影院", "", searchMovieTemplate)
 
 	cinemas := jsonData.GetPath("result").MustArray()
 
