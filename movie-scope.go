@@ -82,6 +82,19 @@ const searchMovieTemplate = `{
 	}
 }`
 
+const warningTemplate = `{
+	"schema-version": 1,
+	"template": {
+        "category-layout": "grid",
+        "card-layout": "horizontal",
+        "card-size": "small"
+	},
+	"components": {
+		"title": "title",
+		"subtitle": "subtitle"
+	}
+}`
+
 // Movie Scope
 type MovieScope struct {
 	base *scopes.ScopeBase
@@ -92,6 +105,18 @@ func (m *MovieScope) SetScopeBase(base *scopes.ScopeBase) {
 }
 
 func (m *MovieScope) Search(query *scopes.CannedQuery, metadata *scopes.SearchMetadata, reply *scopes.SearchReply, cancelled <-chan bool) error {
+
+	// 判断地区，非 CN 地区提示不可用
+	location := metadata.Location()
+	if location != nil && location.CountryCode != "CN" {
+		log.Println("Not allowed country")
+		category := reply.RegisterCategory("warning", "", "", warningTemplate)
+		result := scopes.NewCategorisedResult(category)
+		result.SetTitle("⚠ 警告: 周边电影Scope 可能在您所在地区或网络无法使用, 如果使用了VPN请断开连接使用。")
+		result.SetURI("")
+		// result.SetArt(m.base.ScopeDirectory() + "/local.png")
+		reply.Push(result)
+	}
 
 	// 创建分类
 	department := m.createDepartments(query, metadata, reply)

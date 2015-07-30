@@ -9,7 +9,7 @@
             "apparmor": "apparmor.json"
         }
     },
-    "version": "0.1",
+    "version": "0.1.1",
     "maintainer": "DawnDIY <chenglu1990@gmail.com>",
     "framework" : "ubuntu-sdk-15.04"
 }
